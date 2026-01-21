@@ -229,7 +229,7 @@
         </div>
 
         <div class="search-form">
-            <form id="searchForm">
+            <form id="searchForm" action="/search" method="get">
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="region">Region *</label>
@@ -297,12 +297,13 @@
         });
 
         async function executeSearch() {
-            const formData = new FormData(document.getElementById('searchForm'));
+            const form = document.getElementById('searchForm');
+            const formData = new FormData(form);
             currentParams = {
                 region: formData.get('region'),
-                entity_name: formData.get('entity_name'),
+                entity_name: formData.get('entity_name') || '',
                 business_area: formData.get('business_area'),
-                data_source: formData.get('data_source'),
+                data_source: formData.get('data_source') || '',
                 page: currentPage
             };
 
@@ -313,13 +314,25 @@
             resultsContent.innerHTML = '<div class="loading">Searching...</div>';
 
             try {
-                const queryString = new URLSearchParams(
-                    Object.fromEntries(Object.entries(currentParams).filter(([_, v]) => v))
-                ).toString();
+                const queryParams = new URLSearchParams();
+                queryParams.append('region', currentParams.region);
+                queryParams.append('business_area', currentParams.business_area);
+                queryParams.append('page', currentParams.page);
 
-                const response = await fetch(`/search?${queryString}`);
+                if (currentParams.entity_name) {
+                    queryParams.append('entity_name', currentParams.entity_name);
+                }
+                if (currentParams.data_source) {
+                    queryParams.append('data_source', currentParams.data_source);
+                }
+
+                const response = await fetch(`/search?${queryParams.toString()}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
-
                 displayResults(data);
             } catch (error) {
                 resultsContent.innerHTML = `<div class="no-results">Error: ${error.message}</div>`;
@@ -405,11 +418,18 @@
         }
 
         async function exportCSV() {
-            const queryString = new URLSearchParams(
-                Object.fromEntries(Object.entries(currentParams).filter(([k, v]) => v && k !== 'page'))
-            ).toString();
+            const queryParams = new URLSearchParams();
+            queryParams.append('region', currentParams.region);
+            queryParams.append('business_area', currentParams.business_area);
 
-            window.location.href = `/export?${queryString}`;
+            if (currentParams.entity_name) {
+                queryParams.append('entity_name', currentParams.entity_name);
+            }
+            if (currentParams.data_source) {
+                queryParams.append('data_source', currentParams.data_source);
+            }
+
+            window.location.href = `/export?${queryParams.toString()}`;
         }
     </script>
 </body>
