@@ -36,9 +36,9 @@ opensearch_client = OpenSearch(
 
 class SearchParams(BaseModel):
     region: str = "A"
-    entity_name: Optional[str] = None
     business_area: str = "A"
-    data_source: Optional[str] = None
+    data_source: str = "A"
+    trade_date: str  # Format: YYYY-MM-DD
     page: int = 1
     page_size: int = 100  # Changed from 10 to 100
 
@@ -61,21 +61,20 @@ def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:
         }
     })
 
-    # Add entity name filter if provided
-    if params.entity_name and params.entity_name.strip():
-        must_clauses.append({
-            "match": {
-                "entity_name": params.entity_name
-            }
-        })
+    # Add data source filter
+    must_clauses.append({
+        "match": {
+            "data_source": params.data_source
+        }
+    })
 
-    # Add data source filter if provided
-    if params.data_source and params.data_source.strip():
-        must_clauses.append({
-            "match": {
-                "data_source": params.data_source
-            }
-        })
+    # Add trade date filter (convert to epoch)
+    trade_date_epoch = convert_date_to_epoch(params.trade_date)
+    must_clauses.append({
+        "match": {
+            "tradeDate": trade_date_epoch
+        }
+    })
 
     # Build the query
     query = {
@@ -89,6 +88,18 @@ def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:
     }
 
     return query
+
+
+def convert_date_to_epoch(date_str: str) -> int:
+    """Convert YYYY-MM-DD date string to epoch timestamp in milliseconds"""
+    from datetime import datetime
+    try:
+        dt = datetime.strptime(date_str, '%Y-%m-%d')
+        # Convert to epoch milliseconds (multiply by 1000)
+        epoch_ms = int(dt.timestamp() * 1000)
+        return epoch_ms
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
 
 
 def search_opensearch(params: SearchParams) -> Dict[str, Any]:
@@ -132,7 +143,8 @@ async def home(request: Request):
             {
                 "request": request,
                 "regions": ["A", "E", "I", "O", "U"],
-                "business_areas": ["A", "E", "I", "O", "U"]
+                "business_areas": ["A", "E", "I", "O", "U"],
+                "data_sources": ["A", "E", "I", "O", "U"]
             }
         )
     except Exception as e:
@@ -151,17 +163,17 @@ async def health_check():
 @app.get("/search")
 async def search(
         region: str = Query("A"),
-        entity_name: Optional[str] = Query(None, max_length=100),
         business_area: str = Query("A"),
-        data_source: Optional[str] = Query(None, max_length=100),
+        data_source: str = Query("A"),
+        trade_date: str = Query(..., description="Trade date in YYYY-MM-DD format"),
         page: int = Query(1, ge=1)
 ):
     """Execute search and return results with limited columns for UI"""
     params = SearchParams(
         region=region,
-        entity_name=entity_name,
         business_area=business_area,
         data_source=data_source,
+        trade_date=trade_date,
         page=page
     )
 
@@ -218,16 +230,16 @@ def get_nested_value(data: Dict[str, Any], key: str) -> Any:
 @app.get("/export")
 async def export_csv(
         region: str = Query("A"),
-        entity_name: Optional[str] = Query(None, max_length=100),
         business_area: str = Query("A"),
-        data_source: Optional[str] = Query(None, max_length=100)
+        data_source: str = Query("A"),
+        trade_date: str = Query(..., description="Trade date in YYYY-MM-DD format")
 ):
     """Export search results to CSV (max 100 records)"""
     params = SearchParams(
         region=region,
-        entity_name=entity_name,
         business_area=business_area,
         data_source=data_source,
+        trade_date=trade_date,
         page=1,
         page_size=100
     )

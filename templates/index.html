@@ -244,11 +244,6 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="entity_name">Entity Name</label>
-                        <input type="text" id="entity_name" name="entity_name" maxlength="100" placeholder="Enter entity name">
-                    </div>
-
-                    <div class="form-group">
                         <label for="business_area">Business Area *</label>
                         <select id="business_area" name="business_area" required>
                             {% for area in business_areas %}
@@ -258,8 +253,17 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="data_source">Data Source</label>
-                        <input type="text" id="data_source" name="data_source" maxlength="100" placeholder="Enter data source">
+                        <label for="data_source">Data Source *</label>
+                        <select id="data_source" name="data_source" required>
+                            {% for source in data_sources %}
+                            <option value="{{ source }}" {% if source == "A" %}selected{% endif %}>{{ source }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="trade_date">Trade Date *</label>
+                        <input type="date" id="trade_date" name="trade_date" required>
                     </div>
                 </div>
 
@@ -401,13 +405,8 @@
             const queryParams = new URLSearchParams();
             queryParams.append('region', currentParams.region);
             queryParams.append('business_area', currentParams.business_area);
-
-            if (currentParams.entity_name) {
-                queryParams.append('entity_name', currentParams.entity_name);
-            }
-            if (currentParams.data_source) {
-                queryParams.append('data_source', currentParams.data_source);
-            }
+            queryParams.append('data_source', currentParams.data_source);
+            queryParams.append('trade_date', currentParams.trade_date);
 
             window.location.href = `/export?${queryParams.toString()}`;
         }
