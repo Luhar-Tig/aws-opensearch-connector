@@ -167,27 +167,21 @@ async def search(
 
     results = search_opensearch(params)
 
-    # Map internal field names to display names
-    field_mapping = {
-        'tid': 'tradeID',
-        'tidi': 'tradeIdInternal',
-        'pac': 'primaryAssetClass',
-        'ssn': 'sourceSystemName',
-        'td': 'tradeDate'
-    }
+    # Column names to display
+    ui_columns = ['tradeID', 'tradeIdInternal', 'primaryAssetClass', 'sourceSystemName', 'tradeDate']
 
     limited_results = []
 
     for record in results['results']:
         limited_record = {}
-        for internal_name, display_name in field_mapping.items():
-            value = get_nested_value(record, internal_name)
+        for col in ui_columns:
+            value = get_nested_value(record, col)
 
             # Convert epoch to DD-MON-YYYY UTC for tradeDate
-            if display_name == 'tradeDate' and value:
+            if col == 'tradeDate' and value:
                 value = format_epoch_to_date(value)
 
-            limited_record[display_name] = value
+            limited_record[col] = value
         limited_results.append(limited_record)
 
     results['results'] = limited_results
