@@ -40,7 +40,7 @@ class SearchParams(BaseModel):
     business_area: str = "A"
     data_source: Optional[str] = None
     page: int = 1
-    page_size: int = 10
+    page_size: int = 100  # Changed from 10 to 100
 
 
 def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:

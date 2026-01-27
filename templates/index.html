@@ -219,11 +219,8 @@
             display: none;
         }
 
-        .loading-more {
-            text-align: center;
-            padding: 20px;
-            color: #6c757d;
-            font-style: italic;
+        .escapeHtml {
+            display: none;
         }
     </style>
 </head>
@@ -282,7 +279,6 @@
             </div>
 
             <div id="resultsContent"></div>
-            <div class="loading-more" id="loadingMore" style="display: none;">Loading more results...</div>
         </div>
     </div>
 
@@ -347,17 +343,13 @@
             }
         }
 
-        function displayResults(data, appendMode = false) {
+        function displayResults(data) {
             const resultsCount = document.getElementById('resultsCount');
             const resultsContent = document.getElementById('resultsContent');
 
-            totalPages = data.total_pages;
+            resultsCount.textContent = `Total Results: ${data.total} (showing max 100)`;
 
-            if (!appendMode) {
-                resultsCount.textContent = `Total Results: ${data.total} (showing max 100)`;
-            }
-
-            if (data.results.length === 0 && !appendMode) {
+            if (data.results.length === 0) {
                 resultsContent.innerHTML = `
                     <div class="no-results">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -367,47 +359,30 @@
                         <p>Try adjusting your search criteria</p>
                     </div>
                 `;
-                allResultsLoaded = true;
                 return;
             }
 
-            // Fixed columns for UI display with proper display names
+            // Column names for display
             const headers = ['tradeID', 'tradeIdInternal', 'primaryAssetClass', 'sourceSystemName', 'tradeDate'];
 
-            let tableHTML = '';
-
-            if (!appendMode) {
-                tableHTML = '<div class="table-wrapper"><table class="results-table"><thead><tr>';
-                headers.forEach(header => {
-                    tableHTML += `<th>${header}</th>`;
-                });
-                tableHTML += '</tr></thead><tbody>';
-            }
+            let tableHTML = '<div class="table-wrapper"><table class="results-table"><thead><tr>';
+            headers.forEach(header => {
+                tableHTML += `<th>${header}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
 
             data.results.forEach(result => {
                 tableHTML += '<tr>';
                 headers.forEach(header => {
                     const value = result[header] || '';
-                    tableHTML += `<td title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</td>`;
+                    const escapedValue = escapeHtml(String(value));
+                    tableHTML += `<td title="${escapedValue}">${escapedValue}</td>`;
                 });
                 tableHTML += '</tr>';
             });
 
-            if (!appendMode) {
-                tableHTML += '</tbody></table></div>';
-                resultsContent.innerHTML = tableHTML;
-            } else {
-                // Append to existing tbody
-                const tbody = resultsContent.querySelector('tbody');
-                if (tbody) {
-                    tbody.insertAdjacentHTML('beforeend', tableHTML);
-                }
-            }
-
-            // Check if all results are loaded
-            if (currentPage >= totalPages) {
-                allResultsLoaded = true;
-            }
+            tableHTML += '</tbody></table></div>';
+            resultsContent.innerHTML = tableHTML;
         }
 
         function escapeHtml(text) {
@@ -420,8 +395,6 @@
             document.getElementById('searchForm').reset();
             document.getElementById('resultsContainer').style.display = 'none';
             document.getElementById('resultsContent').innerHTML = '';
-            currentPage = 1;
-            allResultsLoaded = false;
         }
 
         async function exportCSV() {
