@@ -165,6 +165,21 @@
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .results-table thead {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        .results-table tbody {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
         }
 
         .results-table th,
@@ -172,6 +187,9 @@
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid #e9ecef;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
         }
 
         .results-table th {
@@ -180,44 +198,32 @@
             color: #495057;
             position: sticky;
             top: 0;
+            z-index: 10;
+        }
+
+        .results-table td {
+            word-wrap: break-word;
+            white-space: normal;
         }
 
         .results-table tr:hover {
             background: #f8f9fa;
         }
 
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 30px;
+            display: none;
         }
 
-        .pagination button {
-            padding: 8px 16px;
-            border: 2px solid #667eea;
-            background: white;
-            color: #667eea;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .pagination button:hover:not(:disabled) {
-            background: #667eea;
-            color: white;
-        }
-
-        .pagination button:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .pagination span {
-            font-weight: 600;
-            color: #495057;
+        .loading-more {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            font-style: italic;
         }
     </style>
 </head>
@@ -276,8 +282,7 @@
             </div>
 
             <div id="resultsContent"></div>
-
-            <div class="pagination" id="pagination" style="display: none;"></div>
+            <div class="loading-more" id="loadingMore" style="display: none;">Loading more results...</div>
         </div>
     </div>
 
@@ -342,15 +347,17 @@
             }
         }
 
-        function displayResults(data) {
+        function displayResults(data, appendMode = false) {
             const resultsCount = document.getElementById('resultsCount');
             const resultsContent = document.getElementById('resultsContent');
-            const pagination = document.getElementById('pagination');
 
-            resultsCount.textContent = `Total Results: ${data.total} (showing max 100)`;
             totalPages = data.total_pages;
 
-            if (data.results.length === 0) {
+            if (!appendMode) {
+                resultsCount.textContent = `Total Results: ${data.total} (showing max 100)`;
+            }
+
+            if (data.results.length === 0 && !appendMode) {
                 resultsContent.innerHTML = `
                     <div class="no-results">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,102 +367,47 @@
                         <p>Try adjusting your search criteria</p>
                     </div>
                 `;
-                pagination.style.display = 'none';
+                allResultsLoaded = true;
                 return;
             }
 
-            // Fixed columns for UI display
-            const headers = ['tid', 'tidi', 'pac', 'ssn', 'td'];
+            // Fixed columns for UI display with proper display names
+            const headers = ['tradeID', 'tradeIdInternal', 'primaryAssetClass', 'sourceSystemName', 'tradeDate'];
 
-            let tableHTML = '<table class="results-table"><thead><tr>';
-            headers.forEach(header => {
-                tableHTML += `<th>${header.toUpperCase()}</th>`;
-            });
-            tableHTML += '</tr></thead><tbody>';
+            let tableHTML = '';
+
+            if (!appendMode) {
+                tableHTML = '<div class="table-wrapper"><table class="results-table"><thead><tr>';
+                headers.forEach(header => {
+                    tableHTML += `<th>${header}</th>`;
+                });
+                tableHTML += '</tr></thead><tbody>';
+            }
 
             data.results.forEach(result => {
                 tableHTML += '<tr>';
                 headers.forEach(header => {
                     const value = result[header] || '';
-                    tableHTML += `<td>${escapeHtml(String(value))}</td>`;
+                    tableHTML += `<td title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</td>`;
                 });
                 tableHTML += '</tr>';
             });
 
-            tableHTML += '</tbody></table>';
-            resultsContent.innerHTML = tableHTML;
-
-            // Update pagination with clickable page numbers
-            updatePagination(data.total_pages);
-        }
-
-        function updatePagination(totalPages) {
-            const pagination = document.getElementById('pagination');
-
-            if (totalPages <= 1) {
-                pagination.style.display = 'none';
-                return;
-            }
-
-            pagination.style.display = 'flex';
-
-            let paginationHTML = '';
-
-            // Previous button
-            paginationHTML += `<button onclick="changePage(-1)" id="prevBtn" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>`;
-
-            // Page numbers
-            const maxVisiblePages = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-            if (endPage - startPage < maxVisiblePages - 1) {
-                startPage = Math.max(1, endPage - maxVisiblePages + 1);
-            }
-
-            if (startPage > 1) {
-                paginationHTML += `<button onclick="goToPage(1)">1</button>`;
-                if (startPage > 2) {
-                    paginationHTML += `<span style="padding: 0 5px;">...</span>`;
+            if (!appendMode) {
+                tableHTML += '</tbody></table></div>';
+                resultsContent.innerHTML = tableHTML;
+            } else {
+                // Append to existing tbody
+                const tbody = resultsContent.querySelector('tbody');
+                if (tbody) {
+                    tbody.insertAdjacentHTML('beforeend', tableHTML);
                 }
             }
 
-            for (let i = startPage; i <= endPage; i++) {
-                if (i === currentPage) {
-                    paginationHTML += `<button style="background: #667eea; color: white; cursor: default;" disabled>${i}</button>`;
-                } else {
-                    paginationHTML += `<button onclick="goToPage(${i})">${i}</button>`;
-                }
+            // Check if all results are loaded
+            if (currentPage >= totalPages) {
+                allResultsLoaded = true;
             }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    paginationHTML += `<span style="padding: 0 5px;">...</span>`;
-                }
-                paginationHTML += `<button onclick="goToPage(${totalPages})">${totalPages}</button>`;
-            }
-
-            // Next button
-            paginationHTML += `<button onclick="changePage(1)" id="nextBtn" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
-
-            pagination.innerHTML = paginationHTML;
-        }
-
-        function goToPage(page) {
-            currentPage = page;
-            executeSearch();
-        }
-
-        function flattenObject(obj, prefix = '') {
-            return Object.keys(obj).reduce((acc, key) => {
-                const pre = prefix.length ? prefix + '.' : '';
-                if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                    Object.assign(acc, flattenObject(obj[key], pre + key));
-                } else {
-                    acc[pre + key] = obj[key];
-                }
-                return acc;
-            }, {});
         }
 
         function escapeHtml(text) {
@@ -464,15 +416,12 @@
             return div.innerHTML;
         }
 
-        async function changePage(direction) {
-            currentPage += direction;
-            await executeSearch();
-        }
-
         function resetForm() {
             document.getElementById('searchForm').reset();
             document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('resultsContent').innerHTML = '';
             currentPage = 1;
+            allResultsLoaded = false;
         }
 
         async function exportCSV() {

@@ -167,19 +167,46 @@ async def search(
 
     results = search_opensearch(params)
 
-    # Limit to 5 columns for UI display
-    ui_columns = ['tid', 'tidi', 'pac', 'ssn', 'td']
+    # Map internal field names to display names
+    field_mapping = {
+        'tid': 'tradeID',
+        'tidi': 'tradeIdInternal',
+        'pac': 'primaryAssetClass',
+        'ssn': 'sourceSystemName',
+        'td': 'tradeDate'
+    }
+
     limited_results = []
 
     for record in results['results']:
         limited_record = {}
-        for col in ui_columns:
-            # Handle nested fields with dot notation
-            limited_record[col] = get_nested_value(record, col)
+        for internal_name, display_name in field_mapping.items():
+            value = get_nested_value(record, internal_name)
+
+            # Convert epoch to DD-MON-YYYY UTC for tradeDate
+            if display_name == 'tradeDate' and value:
+                value = format_epoch_to_date(value)
+
+            limited_record[display_name] = value
         limited_results.append(limited_record)
 
     results['results'] = limited_results
     return results
+
+
+def format_epoch_to_date(epoch_value: Any) -> str:
+    """Convert epoch timestamp to DD-MON-YYYY UTC format"""
+    try:
+        # Handle both seconds and milliseconds timestamps
+        timestamp = float(epoch_value)
+        if timestamp > 10000000000:  # Likely milliseconds
+            timestamp = timestamp / 1000
+
+        from datetime import datetime
+        dt = datetime.utcfromtimestamp(timestamp)
+        return dt.strftime('%d-%b-%Y UTC').upper()
+    except (ValueError, TypeError):
+        return str(epoch_value)  # Return as-is if conversion fails
 
 
 def get_nested_value(data: Dict[str, Any], key: str) -> Any:
