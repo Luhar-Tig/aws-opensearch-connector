@@ -91,13 +91,16 @@ def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:
 
 
 def convert_date_to_epoch(date_str: str) -> int:
-    """Convert YYYY-MM-DD date string to epoch timestamp in milliseconds"""
-    from datetime import datetime
+    """Convert YYYY-MM-DD date string to epoch timestamp in milliseconds (GMT/UTC)"""
+    from datetime import datetime, timezone
     try:
+        # Parse date and explicitly set timezone to UTC to avoid local timezone issues
         dt = datetime.strptime(date_str, '%Y-%m-%d')
+        dt_utc = dt.replace(tzinfo=timezone.utc)
+
         # Convert to epoch milliseconds (multiply by 1000)
-        # If your OpenSearch stores in seconds, change this to: int(dt.timestamp())
-        epoch_ms = int(dt.timestamp() * 1000)
+        # If your OpenSearch stores in seconds, change this to: int(dt_utc.timestamp())
+        epoch_ms = int(dt_utc.timestamp() * 1000)
         return epoch_ms
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
@@ -235,14 +238,30 @@ async def export_csv(
         data_source: str = Query("A"),
         trade_date: str = Query(..., description="Trade date in YYYY-MM-DD format")
 ):
-    """Export search results to CSV (max 100 records)"""
+    """Export ALL search results to CSV (not limited to 100)"""
+    # First, get the total count
+    params_count = SearchParams(
+        region=region,
+        business_area=business_area,
+        data_source=data_source,
+        trade_date=trade_date,
+        page=1,
+        page_size=1
+    )
+
+    count_result = search_opensearch(params_count)
+    total_records = count_result['total']
+
+    # Now fetch all records (up to OpenSearch limit of 10000)
+    max_export = min(total_records, 10000)  # OpenSearch default max
+
     params = SearchParams(
         region=region,
         business_area=business_area,
         data_source=data_source,
         trade_date=trade_date,
         page=1,
-        page_size=100
+        page_size=max_export
     )
 
     results = search_opensearch(params)
