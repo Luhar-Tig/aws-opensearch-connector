@@ -68,10 +68,10 @@ def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:
         }
     })
 
-    # Add trade date filter (convert to epoch)
+    # Add trade date filter using term query for exact match
     trade_date_epoch = convert_date_to_epoch(params.trade_date)
     must_clauses.append({
-        "match": {
+        "term": {
             "tradeDate": trade_date_epoch
         }
     })
@@ -96,6 +96,7 @@ def convert_date_to_epoch(date_str: str) -> int:
     try:
         dt = datetime.strptime(date_str, '%Y-%m-%d')
         # Convert to epoch milliseconds (multiply by 1000)
+        # If your OpenSearch stores in seconds, change this to: int(dt.timestamp())
         epoch_ms = int(dt.timestamp() * 1000)
         return epoch_ms
     except ValueError:
