@@ -214,14 +214,6 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
-
-        .pagination {
-            display: none;
-        }
-
-        .escapeHtml {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -232,7 +224,7 @@
         </div>
 
         <div class="search-form">
-            <form id="searchForm" action="/search" method="get">
+            <form id="searchForm">
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="region">Region *</label>
@@ -287,30 +279,44 @@
     </div>
 
     <script>
-        let currentPage = 1;
-        let totalPages = 1;
         let currentParams = {};
+        let isLoading = false;
 
         document.getElementById('searchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            currentPage = 1;
+            document.getElementById('resultsContent').innerHTML = '';
             await executeSearch();
         });
 
         async function executeSearch() {
+            if (isLoading) return;
+
             const form = document.getElementById('searchForm');
             const formData = new FormData(form);
+
+            // Get all form values
+            const region = formData.get('region');
+            const businessArea = formData.get('business_area');
+            const dataSource = formData.get('data_source');
+            const tradeDate = formData.get('trade_date');
+
+            // Validate all required fields
+            if (!tradeDate) {
+                alert('Please select a Trade Date');
+                return;
+            }
+
             currentParams = {
-                region: formData.get('region'),
-                entity_name: formData.get('entity_name') || '',
-                business_area: formData.get('business_area'),
-                data_source: formData.get('data_source') || '',
-                page: currentPage
+                region: region,
+                business_area: businessArea,
+                data_source: dataSource,
+                trade_date: tradeDate
             };
 
             const resultsContainer = document.getElementById('resultsContainer');
             const resultsContent = document.getElementById('resultsContent');
 
+            isLoading = true;
             resultsContainer.style.display = 'block';
             resultsContent.innerHTML = '<div class="loading">Searching...</div>';
 
@@ -318,17 +324,14 @@
                 const queryParams = new URLSearchParams();
                 queryParams.append('region', currentParams.region);
                 queryParams.append('business_area', currentParams.business_area);
-                queryParams.append('page', currentParams.page);
+                queryParams.append('data_source', currentParams.data_source);
+                queryParams.append('trade_date', currentParams.trade_date);
+                queryParams.append('page', '1');
 
-                if (currentParams.entity_name) {
-                    queryParams.append('entity_name', currentParams.entity_name);
-                }
-                if (currentParams.data_source) {
-                    queryParams.append('data_source', currentParams.data_source);
-                }
+                console.log('Search URL:', `/search?${queryParams.toString()}`);
 
                 const response = await fetch(`/search?${queryParams.toString()}`, {
-                    signal: AbortSignal.timeout(300000) // 5 minute timeout
+                    signal: AbortSignal.timeout(300000)
                 });
 
                 if (!response.ok) {
@@ -344,6 +347,8 @@
                 } else {
                     resultsContent.innerHTML = `<div class="no-results">Error: ${error.message}</div>`;
                 }
+            } finally {
+                isLoading = false;
             }
         }
 
@@ -366,7 +371,6 @@
                 return;
             }
 
-            // Column names for display
             const headers = ['tradeID', 'tradeIdInternal', 'primaryAssetClass', 'sourceSystemName', 'tradeDate'];
 
             let tableHTML = '<div class="table-wrapper"><table class="results-table"><thead><tr>';
