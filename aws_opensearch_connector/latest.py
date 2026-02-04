@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Query, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from opensearchpy import OpenSearch
 import csv
 import io
@@ -14,6 +15,9 @@ app = FastAPI(title="OpenSearch Query Application")
 # Get the directory where main.py is located
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+# Mount static files directory for CSS
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 # OpenSearch Configuration
 OPENSEARCH_HOST = os.getenv("OPENSEARCH_HOST", "your-opensearch-endpoint.com")
