@@ -254,8 +254,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="trade_date">Trade Date *</label>
-                        <input type="date" id="trade_date" name="trade_date" required>
+                        <label for="trade_date_from">Trade Date From *</label>
+                        <input type="date" id="trade_date_from" name="trade_date_from" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="trade_date_to">Trade Date To *</label>
+                        <input type="date" id="trade_date_to" name="trade_date_to" required>
                     </div>
                 </div>
 
@@ -298,11 +303,18 @@
             const region = formData.get('region');
             const businessArea = formData.get('business_area');
             const dataSource = formData.get('data_source');
-            const tradeDate = formData.get('trade_date');
+            const tradeDateFrom = formData.get('trade_date_from');
+            const tradeDateTo = formData.get('trade_date_to');
 
             // Validate all required fields
-            if (!tradeDate) {
-                alert('Please select a Trade Date');
+            if (!tradeDateFrom || !tradeDateTo) {
+                alert('Please select both Trade Date From and Trade Date To');
+                return;
+            }
+
+            // Validate date range
+            if (new Date(tradeDateFrom) > new Date(tradeDateTo)) {
+                alert('Trade Date From must be earlier than or equal to Trade Date To');
                 return;
             }
 
@@ -310,7 +322,8 @@
                 region: region,
                 business_area: businessArea,
                 data_source: dataSource,
-                trade_date: tradeDate
+                trade_date_from: tradeDateFrom,
+                trade_date_to: tradeDateTo
             };
 
             const resultsContainer = document.getElementById('resultsContainer');
@@ -325,7 +338,8 @@
                 queryParams.append('region', currentParams.region);
                 queryParams.append('business_area', currentParams.business_area);
                 queryParams.append('data_source', currentParams.data_source);
-                queryParams.append('trade_date', currentParams.trade_date);
+                queryParams.append('trade_date_from', currentParams.trade_date_from);
+                queryParams.append('trade_date_to', currentParams.trade_date_to);
                 queryParams.append('page', '1');
 
                 console.log('Search URL:', `/search?${queryParams.toString()}`);
@@ -410,7 +424,8 @@
             queryParams.append('region', currentParams.region);
             queryParams.append('business_area', currentParams.business_area);
             queryParams.append('data_source', currentParams.data_source);
-            queryParams.append('trade_date', currentParams.trade_date);
+            queryParams.append('trade_date_from', currentParams.trade_date_from);
+            queryParams.append('trade_date_to', currentParams.trade_date_to);
 
             window.location.href = `/export?${queryParams.toString()}`;
         }

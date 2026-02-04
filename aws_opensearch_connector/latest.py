@@ -38,9 +38,10 @@ class SearchParams(BaseModel):
     region: str = "A"
     business_area: str = "A"
     data_source: str = "A"
-    trade_date: str  # Format: YYYY-MM-DD
+    trade_date_from: str  # Format: YYYY-MM-DD
+    trade_date_to: str  # Format: YYYY-MM-DD
     page: int = 1
-    page_size: int = 100  # Changed from 10 to 100
+    page_size: int = 100
 
 
 def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:
@@ -68,11 +69,16 @@ def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:
         }
     })
 
-    # Add trade date filter using term query for exact match
-    trade_date_epoch = convert_date_to_epoch(params.trade_date)
+    # Add trade date range filter (from and to dates inclusive)
+    trade_date_from_epoch = convert_date_to_epoch_start(params.trade_date_from)
+    trade_date_to_epoch = convert_date_to_epoch_end(params.trade_date_to)
+
     must_clauses.append({
-        "term": {
-            "tradeDate": trade_date_epoch
+        "range": {
+            "tradeDate": {
+                "gte": trade_date_from_epoch,  # greater than or equal to (inclusive)
+                "lte": trade_date_to_epoch  # less than or equal to (inclusive)
+            }
         }
     })
 
@@ -90,15 +96,31 @@ def build_opensearch_query(params: SearchParams) -> Dict[str, Any]:
     return query
 
 
-def convert_date_to_epoch(date_str: str) -> int:
-    """Convert YYYY-MM-DD date string to epoch timestamp in milliseconds (GMT/UTC)"""
+def convert_date_to_epoch_start(date_str: str) -> int:
+    """Convert YYYY-MM-DD date string to epoch timestamp at start of day (00:00:00 UTC) in milliseconds"""
     from datetime import datetime, timezone
     try:
-        # Parse date and explicitly set timezone to UTC to avoid local timezone issues
+        # Parse date and set to start of day in UTC (00:00:00)
         dt = datetime.strptime(date_str, '%Y-%m-%d')
-        dt_utc = dt.replace(tzinfo=timezone.utc)
+        dt_utc = dt.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
 
-        # Convert to epoch milliseconds (multiply by 1000)
+        # Convert to epoch milliseconds
+        # If your OpenSearch stores in seconds, change this to: int(dt_utc.timestamp())
+        epoch_ms = int(dt_utc.timestamp() * 1000)
+        return epoch_ms
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
+
+
+def convert_date_to_epoch_end(date_str: str) -> int:
+    """Convert YYYY-MM-DD date string to epoch timestamp at end of day (23:59:59.999 UTC) in milliseconds"""
+    from datetime import datetime, timezone
+    try:
+        # Parse date and set to end of day in UTC (23:59:59.999)
+        dt = datetime.strptime(date_str, '%Y-%m-%d')
+        dt_utc = dt.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
+
+        # Convert to epoch milliseconds
         # If your OpenSearch stores in seconds, change this to: int(dt_utc.timestamp())
         epoch_ms = int(dt_utc.timestamp() * 1000)
         return epoch_ms
@@ -164,12 +186,19 @@ async def health_check():
     return {"status": "healthy", "templates_dir": str(BASE_DIR / "templates")}
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "templates_dir": str(BASE_DIR / "templates")}
+
+
 @app.get("/search")
 async def search(
         region: str = Query("A"),
         business_area: str = Query("A"),
         data_source: str = Query("A"),
-        trade_date: str = Query(..., description="Trade date in YYYY-MM-DD format"),
+        trade_date_from: str = Query(..., description="Trade date from in YYYY-MM-DD format"),
+        trade_date_to: str = Query(..., description="Trade date to in YYYY-MM-DD format"),
         page: int = Query(1, ge=1)
 ):
     """Execute search and return results with limited columns for UI"""
@@ -177,7 +206,8 @@ async def search(
         region=region,
         business_area=business_area,
         data_source=data_source,
-        trade_date=trade_date,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
         page=page
     )
 
@@ -236,7 +266,8 @@ async def export_csv(
         region: str = Query("A"),
         business_area: str = Query("A"),
         data_source: str = Query("A"),
-        trade_date: str = Query(..., description="Trade date in YYYY-MM-DD format")
+        trade_date_from: str = Query(..., description="Trade date from in YYYY-MM-DD format"),
+        trade_date_to: str = Query(..., description="Trade date to in YYYY-MM-DD format")
 ):
     """Export ALL search results to CSV (not limited to 100)"""
     # First, get the total count
@@ -244,7 +275,8 @@ async def export_csv(
         region=region,
         business_area=business_area,
         data_source=data_source,
-        trade_date=trade_date,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
         page=1,
         page_size=1
     )
@@ -259,7 +291,8 @@ async def export_csv(
         region=region,
         business_area=business_area,
         data_source=data_source,
-        trade_date=trade_date,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
         page=1,
         page_size=max_export
     )
